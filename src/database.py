@@ -1,8 +1,22 @@
-# Módulo de banco de dados
 import sqlite3
 
+def get_connection():
+    return sqlite3.connect('finance.db')
+
 def init_db():
-    """Inicializa as tabelas do sistema se não existirem."""
-    # Aqui entra o código para criar as tabelas: 
-    # transactions, categories, splits, rules, establishment_profiles
-    pass
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Criação da tabela de transações
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            description TEXT,
+            amount REAL,
+            category TEXT,
+            source TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
