@@ -1,31 +1,37 @@
 import pandas as pd
 import sqlite3
+import os
 
 def importar_csv_nubank(caminho_arquivo):
     """
-    Lê o CSV do Nubank (date, title, amount), limpa os dados e insere no SQLite.
+    Lê o CSV do Nubank (date, title, amount), valida o nome do arquivo 
+    e insere no SQLite.
     """
-    # Lê o arquivo CSV
-    # O Nubank costuma usar separador de vírgula ou ponto e vírgula, 
-    # se der erro, ajuste o parâmetro 'sep' (ex: sep=';')
+    # 1. Validação do nome do arquivo
+    nome_arquivo = os.path.basename(caminho_arquivo)
+    
+    if not nome_arquivo.startswith("Nubank_"):
+        raise ValueError("Erro: O arquivo selecionado não segue o padrão 'Nubank_yyyy-mm-dd.csv'")
+    
+    # Opcional: Extrair a data do nome do arquivo para usar se precisar
+    data_do_arquivo = nome_arquivo.replace("Nubank_", "").replace(".csv", "")
+    print(f"Processando arquivo referente a: {data_do_arquivo}")
+
+    # 2. Lê o arquivo CSV
     df = pd.read_csv(caminho_arquivo)
     
-    # Valida se as colunas estão no formato esperado
+    # 3. Validação das colunas
     if not all(col in df.columns for col in ['date', 'title', 'amount']):
         raise ValueError("O CSV deve conter as colunas: date, title, amount")
     
-    # Limpeza dos dados:
-    # 1. Converte a coluna 'amount' para float (caso venha com R$ ou formato texto)
-    # Remove 'R$', espaços e substitui vírgula por ponto
+    # 4. Limpeza
     df['amount'] = df['amount'].replace({r'R\$': '', r'\.': '', ',': '.'}, regex=True).astype(float)
     
-    # 2. Adiciona a origem dos dados para controle interno
+    # 5. Seleção e origem
+    df = df[['date', 'title', 'amount']]
     df['source'] = 'CSV_NUBANK'
     
-    # 3. Garante que os nomes das colunas batam com o banco (ajuste se necessário)
-    df = df.rename(columns={'date': 'date', 'title': 'description', 'amount': 'amount'})
-    
-    # Conecta ao banco e salva os dados
+    # 6. Salvando no banco
     conn = sqlite3.connect('finance.db')
     df.to_sql('transactions', conn, if_exists='append', index=False)
     conn.close()
