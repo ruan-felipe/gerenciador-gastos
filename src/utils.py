@@ -5,49 +5,53 @@ import re
 from src.processor import classificar_transacao
 
 def importar_csv_nubank(arquivo_processado, nome_original):
-    # 1. Validação do nome
+    """
+    Função principal de ETL.
+    1. Valida o nome do arquivo.
+    2. Limpa e normaliza os dados (DataFrame).
+    3. Insere apenas novas transações no SQLite (prevenindo duplicatas).
+    """
+    
+    # 1. Validação de formato: Garante que o arquivo é um CSV do Nubank (Regex)
+    # Isso evita erros de processar arquivos errados ou fora do padrão
     if not re.match(r"^Nubank_\d{4}-\d{2}-\d{2}\.csv$", nome_original, re.IGNORECASE):
         raise ValueError(f"O arquivo '{nome_original}' não segue o padrão 'Nubank_yyyy-mm-dd.csv'")
     
-    # 2. Leitura e Limpeza
+    # 2. Leitura e Limpeza (Processamento do DataFrame)
     df = pd.read_csv(arquivo_processado)
     
-    # Verifica colunas necessárias
+    # Validação de esquema: Verifica se as colunas obrigatórias existem
     if not all(col in df.columns for col in ['date', 'title', 'amount']):
         raise ValueError("O CSV deve conter as colunas: date, title, amount")
         
+    # Normalização monetária: Remove caracteres indesejados e converte para float
     df['amount'] = df['amount'].astype(str).str.replace('"', '', regex=False).str.strip()
     df['amount'] = df['amount'].str.replace(',', '.', regex=False).str.replace(' ', '', regex=False)
     df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
+    
+    # Remove linhas inválidas onde o valor não foi convertido
     df = df.dropna(subset=['amount'])
     df['source'] = 'CSV_NUBANK'
     
-    # 3. Conexão e Filtragem de Duplicatas linha a linha
-    conn = sqlite3.connect('finance.db')
-    cursor = conn.cursor()
-    
-    novos_dados = 0
-    # Iteramos linha a linha para verificar unicidade no banco
-
+    # 3. Persistência de Dados
     conn = sqlite3.connect('finance.db')
     cursor = conn.cursor()
     
     novos_dados = 0
     
-    # Este é o loop que você perguntou
+    # Iteração sobre cada linha para inserção controlada
     for _, row in df.iterrows():
-        # Verifica duplicatas (já existe?)
+        # Verificação de duplicidade: Evita duplicar registros já importados
         cursor.execute('''
             SELECT 1 FROM transactions 
             WHERE date = ? AND title = ? AND amount = ?
         ''', (row['date'], row['title'], row['amount']))
         
-        # Se não existe no banco, prosseguimos
+        # Se não encontrou o registro (fetchone é None), insere
         if cursor.fetchone() is None:
-            # 1. Classifica a transação usando a nova função
+            # Integração com o módulo processor: Classifica automaticamente no ato da importação
             categoria = classificar_transacao(row['title'])
             
-            # 2. Insere no banco com a categoria encontrada
             cursor.execute('''
                 INSERT INTO transactions (date, title, amount, source, category)
                 VALUES (?, ?, ?, ?, ?)
