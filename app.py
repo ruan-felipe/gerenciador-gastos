@@ -1,79 +1,80 @@
 import streamlit as st
-import os
-# Importações de módulos locais:
-# database.py: Gerencia a estrutura do banco e conexão
-# utils.py: Contém lógica de manipulação de arquivos (CSV)
-# processor.py: Contém regras de negócio e classificação
+import pandas as pd
 from src.database import init_db, get_transactions
 from src.utils import importar_csv_nubank
-from src.processor import classificar_transacao, reclassificar_todas_transacoes, adicionar_regra
+from src.processor import reclassificar_todas_transacoes, adicionar_regra
 
 # 1. Configuração Inicial da Página
-# Define o layout da aplicação como 'wide' para ocupar toda a largura da tela
 st.set_page_config(page_title="Gerenciador Financeiro", layout="wide")
-
-# Garante que as tabelas necessárias existam no arquivo finance.db
 init_db()
 
 st.title("💰 Gerenciador de Gastos")
 
-# 2. Interface de Upload
-# Componente para carregar arquivos. 'accept_multiple_files' permite subir vários extratos de uma vez
-uploaded_files = st.file_uploader("Escolha os arquivos CSV do Nubank", type="csv", accept_multiple_files=True)
+# Sidebar para configuração dinâmica
+st.sidebar.subheader("⚙️ Configurações")
+dia_fechamento = st.sidebar.number_input("Dia de fechamento da fatura", min_value=1, max_value=31, value=7)
 
+# 2. Interface de Upload
+uploaded_files = st.file_uploader("Escolha os arquivos CSV do Nubank", type="csv", accept_multiple_files=True)
 if uploaded_files:
     for uploaded_file in uploaded_files:
-        nome_original = uploaded_file.name
         try:
-            # Chama a função de importação que lê o CSV e insere no banco
-            count = importar_csv_nubank(uploaded_file, nome_original)
-            if count > 0:
-                st.success(f"Arquivo {nome_original}: {count} novas transações adicionadas.")
-            else:
-                st.info(f"Arquivo {nome_original}: Nenhuma transação nova (ou tudo já importado).")
+            count = importar_csv_nubank(uploaded_file, uploaded_file.name)
+            if count > 0: st.success(f"{uploaded_file.name}: {count} novas transações.")
         except ValueError as e:
-            # Tratamento de erro caso o formato do CSV seja inválido
-            st.error(f"Erro no arquivo {nome_original}: {str(e)}")
+            st.error(f"Erro no arquivo {uploaded_file.name}: {str(e)}")
 
-# 3. Área de Visualização
 st.divider()
-st.subheader("📊 Transações Recentes")
 
-# Busca os dados atuais do banco de dados (retorna um DataFrame do Pandas)
+# 3. Processamento e Visualização
 df_transacoes = get_transactions()
 
 if not df_transacoes.empty:
-    # Renderiza a tabela de forma interativa na interface
-    st.dataframe(df_transacoes, use_container_width=True)
+    df_transacoes['date'] = pd.to_datetime(df_transacoes['date'])
+
+    # Lógica de Fatura Dinâmica
+    def definir_fatura(data, dia_corte):
+        # Se o dia é <= corte, pertence ao mês atual; senão, próximo mês
+        if data.day <= dia_corte:
+            return data.to_period('M')
+        else:
+            return (data + pd.offsets.MonthEnd(0)).to_period('M')
+
+    df_transacoes['fatura_ref'] = df_transacoes['date'].apply(lambda x: definir_fatura(x, dia_fechamento)).astype(str)
+
+    # Filtro para Resumo: Exclui pagamentos, mantém estornos (negativos)
+    df_gastos = df_transacoes[~df_transacoes['title'].str.contains('Pagamento recebido', case=False, na=False)].copy()
+
+    # --- Resumo (Pivot) ---
+    st.subheader("📊 Resumo de Gastos (Consumo Líquido)")
+    pivot = pd.pivot_table(
+        df_gastos, values='amount', index='category', columns='fatura_ref', 
+        aggfunc='sum', fill_value=0, margins=True, margins_name='Total'
+    ).drop(columns=['Total'], errors='ignore')
+    
+    st.dataframe(pivot.style.format("{:.2f}"), use_container_width=True)
+
+    # --- Valor Total da Fatura ---
+    total_fatura = df_gastos['amount'].sum()
+    st.metric(label="Valor Líquido Estimado (Total de Gastos + Estornos)", value=f"R$ {total_fatura:.2f}")
+
+    # --- Transações Recentes ---
+    st.subheader("📊 Transações Recentes")
+    st.dataframe(df_transacoes.sort_values(by='date', ascending=False), use_container_width=True)
+
 else:
-    st.info("Nenhuma transação encontrada no banco de dados.")
+    st.info("Nenhuma transação encontrada. Por favor, faça o upload de um extrato.")
 
 # 4. Painel Administrativo
-# O 'expander' mantém a interface limpa, ocultando controles avançados
 with st.expander("⚙️ Gerenciar Categorias"):
-    # Organiza os inputs de texto lado a lado
     col1, col2 = st.columns(2)
-    with col1:
-        nova_keyword = st.text_input("Palavra-chave (ex: Amazon)")
-    with col2:
-        nova_categoria = st.text_input("Categoria (ex: Lazer)")
+    with col1: nova_keyword = st.text_input("Palavra-chave (ex: Amazon)")
+    with col2: nova_categoria = st.text_input("Categoria (ex: Lazer)")
     
-    # Botão para persistir uma nova regra de classificação no banco
-    if st.button("Salvar Regra"):
+    if st.button("Salvar Regra e Atualizar"):
         if nova_keyword and nova_categoria:
             adicionar_regra(nova_keyword, nova_categoria)
-            st.success(f"Regra '{nova_keyword}' -> '{nova_categoria}' salva!")
-        else:
-            st.warning("Preencha todos os campos antes de salvar.")
-
-    st.divider()
-
-    # Funcionalidade de atualização em lote (Batch update)
-    # Útil quando o usuário cadastra uma nova regra e quer aplicá-la ao histórico antigo
-    st.write("Deseja atualizar transações antigas com as novas regras?")
-    if st.button("Aplicar nova regra em transações antigas"):
-        with st.spinner("Reclassificando..."):
             reclassificar_todas_transacoes()
-            st.success("Todas as transações foram reclassificadas!")
-            # Recarrega a página para atualizar a tabela exibida com as novas categorias
             st.rerun()
+        else:
+            st.warning("Preencha todos os campos.")

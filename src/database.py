@@ -52,5 +52,49 @@ def init_db():
             category TEXT
         )
     ''')
+
+    # Seção de auto povoamento de categorias para as transações mais comuns, 
+    # garantindo que o sistema já tenha uma base de regras para classificar as transações mais frequentes. 
+    # Isso é especialmente útil para novos usuários que ainda não definiram suas próprias regras.   
+    cursor.execute("SELECT count(*) FROM rules")
+    if cursor.fetchone()[0] == 0:
+        regras_iniciais = [
+            ("Lider", "Supermercado"), ("Panificadorae", "Alimentação Fora"), 
+            ("Cachorrinhola", "Alimentação Fora"), ("Espeto do Cheff", "Alimentação Fora"),
+            ("Smash Burguers", "Alimentação Fora"), ("Haru", "Alimentação Fora"),
+            ("Jeronimo'S", "Alimentação Fora"), ("Aliexpress", "Compras Online"),
+            ("Alipay", "Compras Online"), ("Mercadolivre", "Compras Online"),
+            ("Lasa", "Vestuário e Beleza"), ("Zerezes", "Vestuário e Beleza"),
+            ("Sephora", "Vestuário e Beleza")
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO rules (keyword, category) VALUES (?, ?)", regras_iniciais)
+
     conn.commit()
     conn.close()
+
+
+def get_summary_table():
+    conn = sqlite3.connect('finance.db')
+    # Carrega dados
+    df = pd.read_sql_query("SELECT date, category, amount FROM transactions", conn)
+    conn.close()
+    
+    if df.empty:
+        return None
+
+    # Força a conversão para garantir que o .dt funcione
+    df['date'] = pd.to_datetime(df['date'])
+    df['mes'] = df['date'].dt.to_period('M').astype(str)
+    
+    # Cria o pivot table
+    pivot = pd.pivot_table(
+        df, 
+        values='amount', 
+        index='category', 
+        columns='mes', 
+        aggfunc='sum', 
+        fill_value=0,
+        margins=True, 
+        margins_name='Total'
+    )
+    return pivot
