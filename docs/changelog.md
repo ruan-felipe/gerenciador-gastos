@@ -1,13 +1,18 @@
 # Registro de Desenvolvimento - Gerenciador de Gastos
 
+## [0.2.0] - 2026-06-24
+### Adicionado
+- **Suporte a OFX:** Implementada função de parser para arquivos OFX (padrão bancário internacional) via `ofxtools`.
+- **Motor de Competência:** Nova lógica de fechamento dinâmico de fatura, permitindo o cálculo do período de competência baseado em dia de corte personalizado.
+- **Auditoria de Fatura:** Nova métrica de consumo líquido (Gastos + Estornos) para validação cruzada com faturas oficiais.
+
+### Alterado
+- **Arquitetura de Ingestão:** Refatoração do módulo `utils.py` para normalizar dados provenientes de fontes heterogêneas (CSV/OFX).
+- **Documentação:** Atualização técnica do `README.md` e `requisitos.md` para refletir as novas capacidades de integração.
+
 ## [0.1.0] - 2026-06-10
 ### Concluído
-- **Estrutura de Repositório:** Definição da hierarquia de pastas (src/, docs/).
-- **Camada de Persistência:** Implementação de `database.py` (SQLite) com a estrutura correta para transações (`id`, `date`, `title`, `amount`, `category`, `source`).
-- **Camada de Ingestão:** Implementação de `utils.py` com validação de formato de arquivo, tratamento de strings (limpeza de caracteres monetários) e conversão de tipos.
-- **Interface (MVP):** `app.py` criado usando Streamlit, permitindo upload seguro de CSVs e integração com os módulos de processamento.
-- **Validação de Segurança:** Tratamento de erros e limpeza de arquivos temporários implementados.
-
-### Em Andamento / Próximo Passo
-- **Motor de Processamento (`processor.py`):** Início da codificação da lógica de conciliação e cálculo de resíduo.
-- **Visualização de Dados:** Integração do banco de dados com gráficos no dashboard.
+- Estrutura inicial do repositório.
+- Camada de persistência (SQLite).
+- Ingestão básica de CSV e interface (MVP).
+- Motor de regras de classificação de transações.
