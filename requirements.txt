@@ -9,8 +9,8 @@ pandas==2.2.2
 # Visualização de dados
 plotly==5.22.0
 
-# O SQLite é nativo do Python (não precisa instalar), mas 
-# mantemos a listagem caso precise de drivers específicos futuramente.
-
 # Utilitários de sistema
 python-dateutil==2.9.0
+
+# Parser bancário (adicionado para suporte a OFX)
+ofxtools==0.9.1
