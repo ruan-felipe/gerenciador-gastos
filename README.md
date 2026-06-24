@@ -1,28 +1,38 @@
-# Gerenciador de Gastos
+# Gerenciador de Gastos Inteligente
 
-Uma aplicação de controle financeiro inteligente, desenvolvida para resolver a ambiguidade de gastos em estabelecimentos híbridos. Diferente de um simples rastreador de despesas, este sistema realiza a **conciliação automática** entre o seu extrato bancário (Nubank) e seus lançamentos manuais diários, utilizando uma lógica de cálculo residual para garantir precisão máxima.
+Uma solução avançada de controle financeiro voltada à conciliação bancária de alta precisão. Desenvolvida para superar as limitações de ferramentas convencionais, esta aplicação oferece uma camada de inteligência sobre extratos bancários, permitindo o tratamento de transações complexas, parcelamentos e a gestão de gastos em estabelecimentos híbridos.
 
-## 🚀 O Problema
-Gerenciar gastos em locais como supermercados é difícil porque eles vendem de tudo (comida, remédios, pets, vestuário). O sistema tradicional de apenas importar o CSV mascara essas variações. Este projeto permite manter o controle diário e, ao final do mês, cruzar dados com o extrato bancário, permitindo a divisão inteligente (splits) e o cálculo automático do valor residual.
+## 🚀 O Diferencial Técnico
+
+A maioria dos rastreadores de despesas baseia-se apenas na leitura passiva de dados. Este sistema implementa uma lógica de conciliação de competência, tratando o seu extrato não como uma simples lista, mas como um registro contábil de fatura.
+
+* **Conciliação Multi-Fonte:** Suporte nativo para CSV e OFX (padrão bancário internacional), garantindo total integridade e rastreabilidade dos dados.
+* **Fechamento Dinâmico:** Algoritmo proprietário que recalcula o período de competência baseado no dia de fechamento definido pelo usuário, permitindo bater a soma do sistema com o valor oficial do PDF da fatura.
+* **Lógica de Resíduo (Smart Split):** Facilita a gestão de estabelecimentos híbridos, permitindo a segregação de gastos de forma inteligente.
+* **Motor de Regras:** Classificação automática com reprocessamento em lote, permitindo que alterações nas regras de negócio atualizem instantaneamente todo o seu histórico financeiro.
 
 ## ⚙️ Funcionalidades
-*   **Conciliação Dual-Source:** Integra lançamentos manuais com a importação de CSV do Nubank.
-*   **Lógica de Resíduo (Smart Split):** Deduz gastos específicos de uma fatura maior, atribuindo o restante automaticamente à categoria principal.
-*   **Projeção Financeira:** Calcula o fechamento da fatura baseado no padrão de consumo.
-*   **Dashboard Interativo:** Visualização de gastos mensais e por categoria.
+
+* **Ingestão Robusta (ETL):** Normalização de dados heterogêneos para um schema único no SQLite.
+* **Dashboards Analíticos:** Visualização de gastos por categoria e período de competência.
+* **Auditoria de Faturas:** Métricas em tempo real que permitem comparar o consumo líquido (gastos + estornos) com o valor final da fatura bancária.
 
 ## 🛠️ Stack Tecnológico
-*   **Linguagem:** Python
-*   **Interface:** Streamlit
-*   **Manipulação de Dados:** Pandas
-*   **Visualização:** Plotly
-*   **Banco de Dados:** SQLite
 
-## 🏗️ Estrutura
-O projeto é modularizado em:
-1. **Ingestão:** Processamento e limpeza de dados (ETL).
-2. **Motor de Regras:** Lógica de conciliação e cálculo residual.
-3. **Interface (UI):** Dashboard interativo para gestão.
+* **Linguagem:** Python 3.x
+* **Interface:** Streamlit (UI reativa)
+* **Engenharia de Dados:** Pandas (Manipulação de séries temporais)
+* **Persistência:** SQLite (Banco relacional com integridade referencial)
+* **Parsers Bancários:** `ofxtools` (Para processamento de arquivos OFX)
+
+## 🏗️ Estrutura do Projeto
+
+O sistema foi desenhado seguindo os princípios de baixo acoplamento e separação de responsabilidades:
+
+1. **app.py**: Camada de apresentação e orquestração da UI.
+2. **database.py**: Camada de persistência e gerenciamento do schema.
+3. **processor.py**: Motor de regras de negócio e reclassificação.
+4. **utils.py**: Módulos de ETL para normalização de CSV e OFX.
 
 ---
-*Desenvolvido como projeto de Engenharia de Computação.*
+*Projeto desenvolvido como parte do curso de Engenharia de Computação.*
