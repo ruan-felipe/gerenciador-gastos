@@ -10,23 +10,13 @@ $$Resíduo = Valor\_Original\_Transação - \sum(Valores\_das\_Exceções)$$
 *   **Exceções (Splits):** Lançamentos manuais feitos pelo usuário para itens específicos dentro daquela mesma compra.
 *   **Resíduo:** O valor remanescente que é automaticamente atribuído à "Categoria Padrão" do estabelecimento.
 
-## 2. Fluxo de Conciliação (Matching)
-O sistema opera em um fluxo de duas pontas que busca minimizar o erro humano:
+## 2. Lógica de Competência (Fatura)
+O sistema não utiliza mais o mês civil padrão para agrupamento.
+- **Regra de Corte:** Toda transação é vinculada a um "Período de Fatura" baseado no dia de fechamento configurado pelo usuário.
+- **Recálculo Dinâmico:** Transações realizadas após o dia de corte são automaticamente atribuídas ao próximo período de competência.
+- **Estornos:** Valores negativos são tratados como redutores do saldo líquido da fatura, garantindo a paridade com o extrato oficial do banco.
 
-### A. Registro (Input)
-*   **Lançamentos Manuais:** Realizados via interface pelo usuário durante o mês.
-*   **Ingestão CSV:** Processada mensalmente via extrato do Nubank.
-
-### B. Matching Automático
-O algoritmo de conciliação tenta associar registros manuais a registros do CSV utilizando os seguintes critérios:
-1.  **Chave de Data:** O sistema busca registros manuais na mesma data (D) ou em um intervalo de tolerância (D +/- 1).
-2.  **Chave de Valor:** Verifica se a soma das exceções manuais é menor que o valor total da transação do CSV.
-
-### C. Níveis de Confiança
-*   **Alta Confiança:** Registro manual encontrado para o mesmo dia e valor compatível. Conciliação realizada automaticamente.
-*   **Baixa Confiança:** Divergências de data ou valor que excedem a margem de erro permitida. O sistema sinaliza o registro como "Pendente de Revisão" para o usuário.
-
-## 3. Gestão de Perfis de Estabelecimento
-Para automatizar o comportamento, o sistema utiliza perfis de locais:
-*   **Perfil Simples:** Locais onde o gasto é recorrente e quase sempre na mesma categoria (ex: Assinatura de streaming).
-*   **Perfil Complexo:** Locais onde a subdivisão de gastos é frequente (ex: Supermercados, Farmácias com conveniência, Postos de gasolina). Nesses locais, o sistema sempre solicita ou verifica a existência de *splits*.
+## 3. Fluxo de Integração (Multi-Fonte)
+O sistema prioriza a integridade dos dados:
+1. **Normalização:** Tanto arquivos CSV quanto OFX são convertidos para um *schema* unificado no banco de dados.
+2. **Conciliação:** (Mantenha as seções anteriores de Matching e Perfis)
