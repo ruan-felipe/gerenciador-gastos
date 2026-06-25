@@ -1,26 +1,35 @@
 # Arquitetura do Sistema
 
 ## 1. Visão Geral
-O Conciliador Financeiro foi desenhado com base em uma arquitetura modular, visando a separação de responsabilidades (Separation of Concerns). Esta abordagem facilita a manutenção, testes unitários e a eventual expansão para outras plataformas (ex: integração via API ou bot).
+O Conciliador Financeiro foi desenhado com base em uma arquitetura modular, visando a separação de responsabilidades (*Separation of Concerns*). Esta abordagem facilita a manutenção, a testabilidade unitária e a escalabilidade para novas fontes de dados bancários (CSV/OFX).
 
 ## 2. Stack Tecnológico
-*   **Linguagem:** Python 3.x
-*   **Interface (UI/UX):** Streamlit (Framework para aplicações de dados)
-*   **Manipulação de Dados (ETL):** Pandas (DataFrames para processamento em memória)
-*   **Persistência de Dados:** SQLite (Banco de dados relacional leve, ideal para aplicações desktop e pequenas ferramentas web)
+* **Linguagem:** Python 3.x
+* **Interface (UI/UX):** Streamlit (Framework reativo para aplicações de dados)
+* **Engenharia de Dados (ETL):** Pandas (DataFrames para processamento em memória e normalização)
+* **Persistência:** SQLite (Banco de dados relacional com integridade referencial)
+* **Parsers Bancários:** `ofxtools` (Para processamento de arquivos OFX)
 
 ## 3. Design Pattern (Modularização)
-A estrutura segue um padrão de organização lógica inspirado no modelo MVC (Model-View-Controller), adaptado para o escopo do projeto:
+A estrutura segue um padrão de organização lógica inspirado no modelo MVC, adaptado para o escopo de um sistema de conciliação:
 
-*   **Camada de Apresentação (`app.py`):** Responsável por renderizar a interface, capturar eventos de input (upload de arquivos) e exibir os resultados. Não contém regras de negócio.
-*   **Camada de Regra de Negócio (`src/processor.py`):** O "Cérebro do sistema". Processa as conciliações, calcula o resíduo e aplica as regras de *split*.
-*   **Camada de Acesso a Dados (`src/database.py` e `src/utils.py`):** Gerencia a persistência (SQL) e a ingestão de dados brutos (CSV).
+* **Camada de Apresentação (`app.py`):** Responsável por renderizar a interface, capturar eventos de input e exibir os resultados. Implementa a lógica de fatura dinâmica baseada no `dia_fechamento`.
+* **Camada de Regra de Negócio (`src/processor.py`):** O "Cérebro do sistema". Processa as conciliações, calcula o resíduo (Smart Split) e aplica as regras de classificação (`reclassificar_todas_transacoes`).
+* **Camada de Ingestão e ETL (`src/utils.py`):** Módulo crítico. Responsável pela normalização de fontes heterogêneas (CSV/OFX) para um schema unificado.
+* **Camada de Acesso a Dados (`src/database.py`):** Gerencia a persistência (SQL), contendo as *constraints* de integridade (ex: `UNIQUE` em transações para evitar duplicidade).
 
-## 4. Estrutura de Diretórios
+## 4. Fluxo de Processamento de Dados (Pipeline)
+1. **Ingestão:** O `utils.py` detecta a fonte (CSV ou OFX).
+2. **Normalização:** O parser converte a estrutura do arquivo para um `DataFrame` padrão (Campos: `date`, `title`, `amount`).
+3. **Consistência:** Verificação de duplicidade no banco (`UNIQUE`) antes da inserção.
+4. **Enriquecimento:** Aplicação automática das regras de negócio (`processor.py`) para categorização inicial.
+
+## 5. Estrutura de Diretórios
 ```text
 /
 ├── app.py              # Ponto de entrada (UI)
 ├── finance.db          # Base de dados (SQLite)
+├── requirements.txt    # Dependências do projeto
 ├── src/                # Código fonte (lógica e backend)
 │   ├── database.py     # Definição do Schema e Conexões
 │   ├── utils.py        # ETL e Ingestão de CSVs
