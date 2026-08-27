@@ -1,8 +1,87 @@
+from ofxtools import OFXTree
 import pandas as pd
 import sqlite3
 import re
 from src.processor import classificar_transacao
 
+def importar_ofx(arquivo_enviado):
+    """
+    Lê o arquivo OFX do Nubank de forma limpa, extrai as transações,
+    aplica a categorização automática via regras e salva no SQLite.
+    """
+    # Lê o conteúdo do arquivo enviado pelo Streamlit (bytes ou string)
+    if hasattr(arquivo_enviado, "read"):
+        conteudo_bytes = arquivo_enviado.read()
+        try:
+            conteudo = conteudo_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            conteudo = conteudo_bytes.decode('latin-1')
+    else:
+        with open(arquivo_enviado, 'r', encoding='utf-8', errors='ignore') as f:
+            conteudo = f.read()
+
+    transacoes = []
+    
+    # Divide o arquivo cru por cada bloco de transação (<STMTTRN>)
+    blocos = conteudo.split('<STMTTRN>')
+    
+    for bloco in blocos[1:]:
+        try:
+            # Regex robustas para capturar os dados ignorando fuso horário e tags fechadas
+            match_data = re.search(r'<DTPOSTED>(\d{8})', bloco)
+            match_valor = re.search(r'<TRNAMT>(-?\d+\.?\d*)', bloco)
+            match_memo = re.search(r'<MEMO>(.*?)(?:</MEMO>|\r?\n|<|$)', bloco)
+            
+            if match_data and match_valor:
+                # Trata a data (AAAAMMDD)
+                data_str = match_data.group(1)[:8]
+                data = pd.to_datetime(data_str, format='%Y%m%d').strftime('%Y-%m-%d')
+                
+                # Trata o valor
+                valor = float(match_valor.group(1)) * -1
+                
+                # Trata a descrição (title)
+                titulo = match_memo.group(1).strip() if match_memo else "Sem descrição"
+                titulo = re.sub(r'<.*?>', '', titulo) # Remove tags residuais se houverem
+                
+                transacoes.append({
+                    'date': data,
+                    'title': titulo,
+                    'amount': valor,
+                    'source': 'OFX_NUBANK'
+                })
+        except Exception:
+            continue
+
+    if not transacoes:
+        return 0
+
+    df = pd.DataFrame(transacoes)
+    
+    # Inserção no banco de dados SQLite com aplicação de regras e blindagem contra duplicadas
+    novos_dados = 0
+    with sqlite3.connect('finance.db') as conn:
+        cursor = conn.cursor()
+        for _, row in df.iterrows():
+            cursor.execute('''
+                SELECT 1 FROM transactions 
+                WHERE date = ? AND title = ? AND amount = ?
+            ''', (row['date'], row['title'], row['amount']))
+            
+            if cursor.fetchone() is None:
+                # 1. AQUI ESTÁ A CORREÇÃO: Aplica a mesma regra inteligente do CSV
+                categoria = classificar_transacao(row['title'])
+                
+                # 2. Insere no banco com a categoria já mapeada pelas suas regras
+                cursor.execute('''
+                    INSERT INTO transactions (date, title, amount, source, category) 
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (row['date'], row['title'], row['amount'], row['source'], categoria))
+                novos_dados += 1
+        conn.commit()
+        
+    return novos_dados
+    
 def importar_csv_nubank(arquivo_processado, nome_original):
     """
     Função principal de ETL (Extract, Transform, Load).

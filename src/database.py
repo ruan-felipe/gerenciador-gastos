@@ -73,28 +73,3 @@ def init_db():
     conn.close()
 
 
-def get_summary_table():
-    conn = sqlite3.connect('finance.db')
-    # Carrega dados
-    df = pd.read_sql_query("SELECT date, category, amount FROM transactions", conn)
-    conn.close()
-    
-    if df.empty:
-        return None
-
-    # Força a conversão para garantir que o .dt funcione
-    df['date'] = pd.to_datetime(df['date'])
-    df['mes'] = df['date'].dt.to_period('M').astype(str)
-    
-    # Cria o pivot table
-    pivot = pd.pivot_table(
-        df, 
-        values='amount', 
-        index='category', 
-        columns='mes', 
-        aggfunc='sum', 
-        fill_value=0,
-        margins=True, 
-        margins_name='Total'
-    )
-    return pivot
